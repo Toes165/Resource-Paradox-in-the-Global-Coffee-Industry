@@ -1,0 +1,319 @@
+---
+title: "Resource Paradox in the Global Coffee Industry"
+author: "Bar Itshaki, Johnnie Lisle, Anderson To"
+format:
+  dashboard:
+    theme: zephyr
+    embed-resources: true
+---
+
+```{r}
+#| warning: false
+
+# Load necessary libraries
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(plotly)
+
+
+coffee_raw_df <- read_csv('/Users/andersongto/Documents/INFO 201/Final Project/FAOSTAT_data_en_2-15-2026.csv')
+
+coffee_clean_df <-
+  coffee_raw_df |>
+  # Filtered for Coffee, green
+  filter(Item == "Coffee, green") |>
+  # Renamed the Countries to match HDI Countries 
+  mutate(
+    Area = ifelse(Area == "Viet Nam", "Vietnam", Area),
+    Area = ifelse(Area == "Russian Federation", "Russia", Area),
+    Area = ifelse(Area == "Democratic Republic of the Congo", "Congo (Democratic Republic of the)", Area),
+    Area = ifelse(Area == "United Republic of Tanzania", "Tanzania (United Republic of)", Area),
+    Area = ifelse(Area == "United States of America", "United States", Area)
+  ) |> 
+  # Renamed Area as Country and Value to Production Tonnes
+  rename(Country = Area, Production_Tonnes = Value)
+
+
+hdi_raw_df <- read_excel('/Users/andersongto/Documents/INFO 201/Final Project/hdr-data.xlsx')
+
+hdi_clean_df <-
+  hdi_raw_df |>
+  # Changed data type to numeric
+  mutate(
+    year = as.numeric(year),
+    country = ifelse(country == "Viet Nam", "Vietnam", country)
+    ) |>
+  # Renamed value to HDI_score
+  rename(HDI_score = value)
+
+
+# Joined data by Country and Year
+coffee_hdi_df <- 
+  left_join(coffee_clean_df, hdi_clean_df, join_by(Country == country, Year == year))
+
+coffee_hdi_df <-
+  coffee_hdi_df |>
+  # Selected relevant columns
+  select(Country, Year, Production_Tonnes, HDI_score)
+
+
+coffee_hdi_df <-
+  coffee_hdi_df |>
+  # Cleaned rows by filtering missing values
+  filter(!is.na(Production_Tonnes), !is.na(HDI_score))
+
+
+coffee_hdi_df <-
+  coffee_hdi_df |>
+  mutate(
+    # Clean columns by changing data type for HDI_score to numeric
+    HDI_score = as.numeric(HDI_score)
+    )
+
+coffee_hdi_df <-
+  coffee_hdi_df |>
+  mutate(
+    # Created categorical column for above and below average
+    Production_Category = ifelse(Production_Tonnes < mean(Production_Tonnes), 
+                                    "Below Average", "Above Average")
+    )
+
+```
+
+# Project Introduction
+
+## Row 1
+
+### Row 1 Column 1
+
+::: {.card title="Project Overview"}
+The global coffee industry presents a fascinating study of the resource paradox where countries serving as the primary engines of production often experience lower levels of human development compared to the nations consuming their products. This project investigates the correlation between a nation status as a top coffee producer and its corresponding human development metrics. By analyzing these trends the goal is to uncover how economic output from agricultural exports translates or fails to translate into improved standards of living for the populations involved.
+
+**3 Big Questions:**  
+  
+1. How does the volume of green coffee production in a country correlate with its Human Development Index score?  
+
+2. Are there specific regions where the Resource Paradox is most pronounced showing high production but low development?  
+3. How has the relationship between coffee production and human development evolved over the recent years 2020 to 2023?  
+
+The background for these questions is rooted in the resource curse theory which suggests that countries with an abundance of natural resources often face stagnant economic growth and poor development outcomes. While coffee is a renewable agricultural commodity reports highlight that many small scale farmers remain in poverty despite their essential role in the global supply chain. This highlights a clear disconnect between the high value of the global coffee industry and the actual well being of the producers. Understanding this paradox is critical because it highlights systemic inequalities in global trade and the ethical implications of consumption. However there are significant ethical limitations to consider. These datasets rely on national averages which can mask internal regional disparities and the actual conditions of individual farmers. Furthermore the data lacks the granularity to address hidden issues like wage theft or localized human rights abuses.
+:::
+
+### Row 1 Column 2
+
+::: {.card title="Data Context"}
+## **Dataset 1**  
+**Link:** [FAOSTAT Dataset](https://www.fao.org/faostat/en/#data/QCL)  
+**Organization Name:** Food and Agriculture Organization of the United Nations  
+**Dataset Description:** The coffee production data is publicly available through the FAOSTAT database. This dataset was created and is maintained by the Food and Agriculture Organization of the United Nations an agency responsible for standardizing agricultural data reported by national governments worldwide. The sample includes 409 rows of coffee production data recorded annually between 2020 and 2024 focusing on green coffee production in metric tonnes. The measurements are based on official figures provided by member nations making it a reliable source for academic research. A primary benefit of this sample is its global scope though a shortcoming is the presence of missing production values for certain rows and the exclusion of territories that are not sovereign countries.
+
+## **Dataset 2**  
+**Link:** [HDR Dataset](https://hdr.undp.org/data-center/documentation-and-downloads)   
+**Organization Name:** United Nations Development Programme's Human Development Report Office  
+**Dataset Description:** The human development data is publicly accessible via the United Nations Development Programme Data Center. This dataset is created by the Human Development Report Office of the UNDP which validates data from international statistical bodies and national governments. The sample consists of longitudinal data for over 190 countries with this project focusing on the most recent scores from 2020 to 2023. Each recording includes a composite Human Development Index score derived from measurements of life expectancy schooling and gross national income. While this sample accurately identifies broad correlations its primary shortcoming is that it reduces complex human lives into simple numbers potentially hiding systemic unfairness behind technical statistics.
+:::
+
+# Question 1 - Trends Over Time
+
+## Row 1
+How has the relationship between coffee production and human development evolved over the recent years 2020 to 2023?
+
+## Row 2
+### Row 1 Column 1 {width=60%}
+
+```{r}
+# Getting the top 10 countries
+top10_countries <- 
+  coffee_hdi_df |>
+  group_by(Country) |>
+  summarise(Total = sum(Production_Tonnes, na.rm = TRUE)) |>
+  # Gets the top 10
+  slice_max(Total, n = 10) |>
+  # Pull only the country out
+  pull(Country)
+
+# Dataframe for all the data for countries in the top 10
+q3_df <- 
+  coffee_hdi_df |>
+  # Filtered for countries in top 10
+  filter(Country %in% top10_countries) |>
+  # Shortened the name of countries to fit plot
+  mutate(
+      Country = ifelse(Country == "Bolivia (Plurinational State of)", "Bolivia", Country),
+      Country = ifelse(Country == "Tanzania (United Republic of)", "Tanzania", Country)
+    )
+
+# Create line plot with scatter plot at each year point
+q3_plot <- 
+  q3_df |>
+  ggplot(aes(
+    x     = Year,
+    y     = HDI_score,
+    color = Country
+  )) +
+  geom_line(linewidth = 1.2) +
+  geom_point() +
+  labs(
+    title  = "HDI Trends for Top 10 Coffee Producers (2020–2023)",
+    x      = "Year",
+    y      = "HDI Score"
+  ) +
+  # Makes background of visual white
+  theme_minimal()
+
+q3_plot |> ggplotly()
+```
+
+
+### Row 1 Column 2 {width=40%}
+
+::: {.card title="Description of Visualization"}
+This line graph tracks the HDI scores of the top ten global coffee producers from 2020 to 2023. It allows us to see whether the economic power of these industry leaders is translating into measurable development growth over time or if their scores remain stagnant despite global market fluctuations.
+:::
+
+
+# Question 2 - Production vs. HDI
+
+## Row 1
+
+How does the volume of green coffee production in a country correlate with its Human Development Index score?
+
+## Row 2
+### Row 2 Column 1 {width=30%}
+::: {.card title="Description of Visualization"}
+This interactive scatter plot examines the relationship between annual green coffee production and a nation's Human Development Index (HDI). By utilizing point size to represent production volume, we can visually identify if the largest producers also achieve higher development standards. The orange benchmark line at 0.55 HDI provides a clear indicator of where many core producers currently sit relative to global development averages.
+:::
+
+### Row 2 Column 2 {width=70%}
+```{r}
+#| warning: false
+
+q1_plot <- 
+  coffee_hdi_df |>
+  ggplot(aes(
+    x = Production_Tonnes,
+    y = HDI_score,
+    color = Country,
+    size = Production_Tonnes
+  )) +
+  geom_point(alpha = 0.8) +
+  geom_hline(yintercept = 0.55, color = "orange", linetype = "dotted") +
+  annotate("text", x = 3e6, y = 0.565, label = "Coffee producers avg HDI ≈ 0.55",
+           color = "orange", size = 3) +
+  labs(
+    title  = "Green Coffee Production vs. Human Development Index",
+    x      = "Green Coffee Production (tonnes)",
+    y      = "HDI Score",
+    color  = "Country"
+  ) + 
+  # Makes background of visual white
+  theme_minimal() +
+  # Labeled the scale to include tonnes after the number
+  scale_x_continuous(labels = scales::label_number(suffix = " tonnes", scale_cut = scales::cut_short_scale()))
+
+# Made plot interactive and gave tooltips to each point
+q1_plot |> ggplotly(tooltip = c("colour", "x", "y"))
+```
+# Question 3 - Regional Paradox
+
+## Row 1
+Are there specific regions where the Resource Paradox is most pronounced showing high production but low development?
+
+## Row 2
+
+### Row 2 Column 1 {width=70%}
+
+```{r}
+# Gave regions manually for Latin America, Africa, Asia & Pacific
+q2_df <- coffee_hdi_df |>
+  mutate(Region = 
+           ifelse(Country %in% c("Brazil", "Colombia", "Peru", "Bolivia (Plurinational State of)", "Honduras", "Guatemala", "Mexico", "Costa Rica", "Nicaragua", "Ecuador"), "Latin America",
+           ifelse(Country %in% c("Ethiopia", "Uganda", "Tanzania (United Republic of)", "Congo (Democratic Republic of the)", "Cameroon", "Ivory Coast", "Madagascar", "Rwanda", "Burundi", "Kenya"), "Africa", 
+           ifelse(Country %in% c("Vietnam", "Indonesia", "India", "Philippines","Papua New Guinea", "Laos", "Thailand", "Myanmar"), "Asia & Pacific",
+            "Other")
+           ))) |>
+  # Filtered out all regions that have other
+  filter(Region != "Other") |>
+  # Averaged out country production and HDI
+  group_by(Country, Region) |>
+  summarise(
+    Avg_Production = mean(Production_Tonnes, na.rm = TRUE),
+    Avg_HDI        = mean(HDI_score, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  # Added HDI level column, setting it high, medium, or low based on HDI
+  mutate(
+    HDI_Level = ifelse(Avg_HDI >= 0.70, "High (≥0.70)",
+                ifelse(Avg_HDI >= 0.55, "Medium (0.55–0.70)",
+                "Low (<0.55)"
+                )
+        ),
+    HDI_Level = factor(HDI_Level, levels = c("High (≥0.70)", "Medium (0.55–0.70)", "Low (<0.55)")),
+    Country = ifelse(Country == "Bolivia (Plurinational State of)", "Bolivia", Country),
+    Country = ifelse(Country == "Tanzania (United Republic of)", "Tanzania", Country),
+    Country = ifelse(Country == "Congo (Democratic Republic of the)", "DRC", Country),
+    Country = ifelse(Country == "Papua New Guinea", "PNG", Country),
+    Country = fct_reorder(Country, Avg_Production)
+  )
+
+
+q2_plot <- q2_df |>
+  ggplot(aes(x = Avg_Production, y = Country, fill = HDI_Level, label = Region)) +
+  geom_col() +
+  scale_fill_manual(values = c(
+    "High (≥0.70)"       = "darkgreen",
+    "Medium (0.55–0.70)" = "orange",
+    "Low (<0.55)"        = "darkred"
+  )) +
+  facet_wrap(vars(Region), scales = "free_y", ncol = 1) +
+  labs(
+    title = "Resource Paradox by Region: Coffee Production vs. HDI Level",
+    x     = "Average Coffee Production (tonnes)",
+    fill  = "HDI Level"
+  ) +
+  # Makes background of visual white
+  theme_minimal() + 
+  # Labeled the scale to include tonnes after the number
+  scale_x_continuous(labels = scales::label_number(suffix = " tonnes", scale_cut = scales::cut_short_scale()))
+
+ggplotly(q2_plot, tooltip = c("y", "x", "fill", "label"))
+```
+
+### Row 2 Column 2 {width=30%}
+
+::: {.card title="Description of Visualization"}
+This faceted bar chart breaks down coffee production by geographic region (Latin America, Africa, and Asia & Pacific) to visualize the "Resource Paradox" across different contexts. By color-coding bars according to HDI levels (Low, Medium, or High), the graph highlights how high-output nations in Africa and Asia often struggle with lower development scores compared to their Latin American counterparts.
+:::
+
+# Project Takeaways
+
+## Row 1
+
+::: {.card title="Takeaways"}
+The data confirms a notable resource paradox within the coffee industry, as high production volumes do not consistently correlate with high Human Development Index scores. A significant cluster of global producers maintains an index score near 0.55, suggesting that the wealth generated by coffee exports often fails to reach the populations responsible for the labor. This indicates that while coffee is a valuable global commodity, its current trade structure may be perpetuating development stagnation rather than alleviating it.
+
+Regional analysis reveals that geography plays a critical role in how this paradox manifests. Producers in Latin America generally achieve higher development levels than those in Africa or the Asia Pacific region for similar production levels, pointing to a need for deeper investigation into national policy and regional trade agreements. However, because this analysis relies on national averages, it likely overestimates the well being of individual farmers by masking localized poverty and wealth inequality within these nations.
+
+Future research should focus on incorporating localized wage data and environmental impact metrics to gain a more granular understanding of these disparities. Moving beyond broad national statistics would allow for a more ethical assessment of the supply chain and help identify specific areas where trade reforms could most effectively improve the lives of producers.
+:::
+
+# Group Info & Notes
+
+## Row 1 {height=70%}
+::: {.card title="Group Information"}
+
+The main topic of interest for this group project is the Resource Paradox in the Global Coffee Industry investigating the correlation between a nation status as a top coffee producer and its corresponding human development metrics.
+
+
+**Bar Itshaki** (The Information School, University of Washington; bitshaki@uw.edu) is interested in the application of macro-data analysis to reveal and address systemic economic disparities within global trade. Bar is a student in the Electrical & Computer Engineering program (Class of 2028) and is the Founder and President of ESEC at UW, with a career interest in building equitable and impactful technology startups.
+
+**Anderson To** (The Information School, University of Washington; ato2@uw.edu) is interested in how data can be utilized to create diverse and accessible technology. Anderson is a student in the Informatics program (Class of 2027), with an interest in using data to provide analytics and a career interest in data analytics or software engineering.
+
+**Johnnie Lisle** (The Information School, University of Washington; jwl27@uw.edu) is interested in how humans interact with technology and the effects that come from it. I take interested careers centering around the ethics behind technology and information, not only about the information its self but how it delivered.
+:::
+
+## Row 2 {height=30%}
+::: {.card title="Coding Notes"}
+The technical portions of this deliverable were executed mostly using the tools and methodologies covered in class activities, lectures, and required readings but different techniques were also applied here from our own computer science research and skill set that expands beyond the class. Specifically, we used R and the Tidyverse package for data cleaning, joining, and visualization. The final report was structured and rendered using Quarto. No external resources or tools from outside the course curriculum were used besides general knowledge varying between each member learned from previous experience.
+:::
