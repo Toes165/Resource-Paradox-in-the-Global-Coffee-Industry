@@ -199,7 +199,7 @@ q1_plot <-
   )) +
   geom_point(alpha = 0.8) +
   geom_hline(yintercept = 0.55, color = "orange", linetype = "dotted") +
-  annotate("text", x = 3e6, y = 0.565, label = "Coffee producers avg HDI ≈ 0.55",
+  annotate("text", x = 5e1, y = 0.565, label = "Coffee producers avg HDI ≈ 0.55",
            color = "orange", size = 3) +
   labs(
     title  = "Green Coffee Production vs. Human Development Index",
@@ -209,8 +209,8 @@ q1_plot <-
   ) + 
   # Makes background of visual white
   theme_minimal() +
-  # Labeled the scale to include tonnes after the number
-  scale_x_continuous(labels = scales::label_number(suffix = " tonnes", scale_cut = scales::cut_short_scale()))
+  # Labeled the scale to include tonnes after the number and scaled by log10
+  scale_x_log10(labels = scales::label_number(suffix = " tonnes"))
 
 # Made plot interactive and gave tooltips to each point
 q1_plot |> ggplotly(tooltip = c("colour", "x", "y"))
