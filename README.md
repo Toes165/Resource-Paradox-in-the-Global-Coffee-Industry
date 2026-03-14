@@ -1,7 +1,7 @@
 # Resource Paradox in the Global Coffee Industry
 
 **Authors:** Bar Itshaki, Johnnie Lisle, Anderson To  
-**Affiliation:** The Information School, University of Washington
+**Affiliation:** The Information School, University of Washington  
 **Project Link:** [https://toes165.github.io/Resource-Paradox-in-the-Global-Coffee-Industry/](https://toes165.github.io/Resource-Paradox-in-the-Global-Coffee-Industry/)
 ---
 
